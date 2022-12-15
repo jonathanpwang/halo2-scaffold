@@ -13,7 +13,7 @@ ark-std = { version = "0.3.0", features = ["print-trace"] }
 halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2.git", tag = "v2022_10_22" }
 
 # Axiom's helper API with basic functions 
-halo2_base = { git = "ssh://github.com/axiom-crypto/halo2-lib-working.git", branch = "experiment/optimizations", package = "halo2_base",  default-features = false, features = ["halo2-pse"] }
+halo2-base = { git = "ssh://github.com/axiom-crypto/axiom-core-working.git", branch = "experiment/optimizations", default-features = false, features = ["halo2-pse"] }
 
 [features]
 default = []
