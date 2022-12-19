@@ -79,7 +79,7 @@ impl Circuit<Fr> for MyCircuit {
                     region,
                     ContextParams {
                         max_rows: config.max_rows,
-                        num_advice: vec![config.num_advice],
+                        num_context_ids: 1,
                         fixed_columns: config.constants.clone(),
                     },
                 );
