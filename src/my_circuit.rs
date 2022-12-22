@@ -89,7 +89,7 @@ impl<F: FieldExt> Circuit<F> for StandardPlonk<F> {
                 // by default, cells all have value 0 (except maybe the very last few rows, where there are "blinding factors" for zero knowledge)
 
                 // square x
-                // row 1: | x | x | 0 | 0 | 0 | 0 | 1 | 0 |
+                // row 1: | x | x | x^2 | 0 | 0 | -1 | 1 | 0 |
                 x.copy_advice(|| "", &mut region, config.a, 1)?;
                 x.copy_advice(|| "", &mut region, config.b, 1)?;
                 let val = x.value().map(|x| *x * x);
@@ -106,6 +106,8 @@ impl<F: FieldExt> Circuit<F> for StandardPlonk<F> {
                 region.assign_fixed(|| "", config.q_c, 2, || Value::known(-F::one()))?;
                 region.assign_fixed(|| "", config.q_ab, 2, || Value::known(F::one()))?;
                 region.assign_fixed(|| "", config.constant, 2, || Value::known(c))?;
+
+                // EXERCISE: can you compute x^2 + 72 in one row?
 
                 Ok(())
             },

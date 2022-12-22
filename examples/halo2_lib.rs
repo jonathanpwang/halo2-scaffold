@@ -43,7 +43,7 @@ impl Circuit<Fr> for MyCircuit {
     fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
         // you can always set strategy to Vertical and context_id = 0 for now
         // we need to know `degree` where the final circuit will have `2^degree` rows
-        // `advice` is the number of fixed columns
+        // `advice` is the number of advice columns
         // `fixed` is the number of fixed columns
         let degree: usize = std::env::var("DEGREE")
             .unwrap_or_else(|_| panic!("set DEGREE env variable to usize"))
