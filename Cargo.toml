@@ -10,10 +10,10 @@ rand = "0.8"
 ark-std = { version = "0.3.0", features = ["print-trace"] }
 
 # halo2
-halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2.git", tag = "v2022_10_22" }
+halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2.git" }
 
 # Axiom's helper API with basic functions 
-halo2-base = { git = "ssh://github.com/axiom-crypto/axiom-core-working.git", branch = "experiment/optimizations", default-features = false, features = ["halo2-pse"] }
+halo2-base = { git = "ssh://github.com/axiom-crypto/axiom-core-working.git", default-features = false, features = ["halo2-pse"] }
 
 [features]
 default = []
