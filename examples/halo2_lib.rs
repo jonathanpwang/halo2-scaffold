@@ -1,17 +1,24 @@
+use std::vec;
+
 use ark_std::{end_timer, start_timer};
 use halo2_base::{
     gates::{
         flex_gate::{FlexGateConfig, GateStrategy},
         GateInstructions,
     },
-    Context, ContextParams,
+    utils::ScalarField,
+    AssignedValue, Context, ContextParams,
     QuantumCell::{Constant, Existing, Witness},
 };
 use halo2_proofs::{
     arithmetic::Field,
     circuit::{Layouter, SimpleFloorPlanner, Value},
+    dev::MockProver,
     halo2curves::bn256::{Bn256, Fr, G1Affine},
-    plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, Circuit, ConstraintSystem, Error},
+    plonk::{
+        create_proof, keygen_pk, keygen_vk, verify_proof, Assigned, Circuit, ConstraintSystem,
+        Error,
+    },
     poly::{
         commitment::ParamsProver,
         kzg::{
@@ -26,13 +33,46 @@ use halo2_proofs::{
 };
 use rand::rngs::OsRng;
 
+#[derive(Clone, Debug)]
+struct PoseidonConfig<F: ScalarField> {
+    pub gate: FlexGateConfig<F>,
+}
+
+#[derive(Clone, Debug)]
+struct PoseidonChip<'v, F: ScalarField> {
+    pub config: PoseidonConfig<F>,
+    pub buffer: Vec<AssignedValue<'v, F>>,
+}
+
+impl<'v, F: ScalarField> PoseidonChip<'v, F> {
+    pub fn new(config: PoseidonConfig<F>) -> Self {
+        Self { config, buffer: vec![] }
+    }
+    pub fn update(&mut self, stream: &[AssignedValue<'v, F>]) {
+        for x in stream.iter() {
+            self.buffer.push(x.clone());
+        }
+    }
+    pub fn squeeze(&mut self, ctx: &mut Context<'v, F>) -> AssignedValue<'v, F> {
+        let mut res = self.config.gate.load_constant(ctx, F::zero());
+        for x in self.buffer.iter() {
+            let res2 = self.config.gate.mul(ctx, Existing(&res), Existing(&res));
+            let res4 = self.config.gate.mul(ctx, Existing(&res2), Existing(&res2));
+            let res5 = self.config.gate.mul(ctx, Existing(&res4), Existing(&res));
+            res = self.config.gate.add(ctx, Existing(&res5), Existing(&x));
+        }
+        self.buffer.clear();
+        res
+    }
+}
+
 #[derive(Clone, Default)]
 struct MyCircuit {
     x: Value<Fr>,
 }
 
 impl Circuit<Fr> for MyCircuit {
-    type Config = FlexGateConfig<Fr>;
+    type Config = PoseidonConfig<Fr>;
     type FloorPlanner = SimpleFloorPlanner; // we will always use SimpleFloorPlanner
 
     fn without_witnesses(&self) -> Self {
@@ -49,7 +89,9 @@ impl Circuit<Fr> for MyCircuit {
             .unwrap_or_else(|_| panic!("set DEGREE env variable to usize"))
             .parse()
             .unwrap_or_else(|_| panic!("set DEGREE env variable to usize"));
-        FlexGateConfig::configure(meta, GateStrategy::Vertical, &[1], 1, 0, degree)
+        let gate = FlexGateConfig::configure(meta, GateStrategy::Vertical, &[2], 1, 0, degree);
+        println!("{}", meta.blinding_factors());
+        PoseidonConfig { gate }
     }
 
     fn synthesize(
@@ -78,33 +120,24 @@ impl Circuit<Fr> for MyCircuit {
                 let mut ctx = Context::new(
                     region,
                     ContextParams {
-                        max_rows: config.max_rows,
+                        max_rows: config.gate.max_rows,
                         num_context_ids: 1,
-                        fixed_columns: config.constants.clone(),
+                        fixed_columns: config.gate.constants.clone(),
                     },
                 );
 
                 // now to the actual computation
 
                 // first we load a private input `x` (let's not worry about public inputs for now)
-                let x = config.assign_witnesses(&mut ctx, vec![self.x]).pop().unwrap();
+                let x = config.gate.assign_witnesses(&mut ctx, vec![self.x]).pop().unwrap();
 
-                // square x
-                let x_sq = config.mul(&mut ctx, Existing(&x), Existing(&x));
-
-                // x^2 + 72
-                let c = Fr::from(72);
-                let _ = config.add(&mut ctx, Existing(&x_sq), Constant(c));
-
-                // here is a more optimal way to compute x^2 + 72 using our API:
-                let val = x.value().map(|x| *x * x + c);
-                let _ = config.assign_region_last(
-                    &mut ctx,
-                    vec![Constant(c), Existing(&x), Existing(&x), Witness(val)],
-                    vec![(0, None)],
-                );
+                let mut poseidon_chip = PoseidonChip::new(config.clone());
+                poseidon_chip.update(&vec![x.clone(); 5]);
+                let y = poseidon_chip.squeeze(&mut ctx);
+                println!("{:?}", y.value());
                 // the `vec![(0, None)]` tells us to turn on a vertical `a + b * c = d` gate at row position 0. Ignore the `None` for now - it's just always there
 
+                ctx.print_stats(&["Gate"]);
                 Ok(())
             },
         )?;
@@ -115,13 +148,17 @@ impl Circuit<Fr> for MyCircuit {
 }
 
 fn main() {
-    let k = 5; // this is the log_2(rows) you specify
+    let k = 6; // this is the log_2(rows) you specify
     std::env::set_var("DEGREE", k.to_string());
+    // just to emphasize that for vk, pk we don't need to know the value of `x`
+    let circuit = MyCircuit { x: Value::known(Fr::random(OsRng)) };
+
+    MockProver::run(k, &circuit, vec![]).unwrap().assert_satisfied();
+
+    let circuit = MyCircuit { x: Value::unknown() };
     // we generate a universal trusted setup of our own for testing
     let params = ParamsKZG::<Bn256>::setup(k, OsRng);
 
-    // just to emphasize that for vk, pk we don't need to know the value of `x`
-    let circuit = MyCircuit { x: Value::unknown() };
     let vk = keygen_vk(&params, &circuit).expect("vk should not fail");
     let pk = keygen_pk(&params, vk, &circuit).expect("pk should not fail");
 
