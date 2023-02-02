@@ -3,27 +3,20 @@ name = "halo2-scaffold"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 rand = "0.8"
 ark-std = { version = "0.3.0", features = ["print-trace"] }
 
 # halo2
-halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2.git" }
+halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2.git", tag = "v2023_01_20" }
 
 # Axiom's helper API with basic functions 
-halo2-base = { git = "ssh://git@github.com/axiom-crypto/axiom-core-working.git", default-features = false, features = ["halo2-pse", "display"] }
+halo2-base = { git = "https://github.com/axiom-crypto/halo2-lib.git", default-features = false, features = ["halo2-pse", "display"] }
 
 [features]
 default = []
 
-[profile.dev]
-opt-level = 3
-
 [profile.release]
-debug = true
+debug = 1 
 opt-level = 3
 lto = "thin" 
-codegen-unit=1
-panic = "abort"

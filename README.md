@@ -1,6 +1,6 @@
 # Halo2 Scaffolding
 
-`my_circuit.rs` contains basic demonstration of how to create a halo2 circuit using the (PSE fork of) the halo2_proofs API.
+`my_circuit.rs` contains a basic demonstration of how to create a halo2 circuit using the (PSE fork of) the halo2_proofs API.
 It shows creation of a "custom gate" that implements the standard PLONK gate.
 
 To run the mock prover for testing purposes,
